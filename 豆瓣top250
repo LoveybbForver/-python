@@ -1,0 +1,92 @@
+import json
+import requests
+from requests.exceptions import RequestException
+import re
+import time
+import openpyxl
+
+def get_one_page(url):
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)+ '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) +'
+                          'Chrome/80.0.3987.162 Safari/537.36 Edg/80.0.361.109'
+        }
+        # 添加headers
+        response = requests.get(url, headers=headers)
+        # 响应状态码查询
+        if response.status_code == 200:
+            return response.text
+        return None
+    except RequestException:
+        return None
+
+# 定义get函数
+def parse_one_page(html):
+
+    # 正则表达式
+    pattern = re.compile('<li>.*?<em class="">(.*?)<.*?href=(.*?)>.*?src=(.*?)class.*?<span class="title">(.*?)</span>+'
+                         '.*?other.*?nbsp;(.*?)</span>+'
+                         '.*?<p class="".*?>(.*?)...<br>(.*?)</p>.*?<span>(.*?)</span>+'
+                         '.*?"inq">(.*?)</span>.*?</li>', re.S)
+    items = re.findall(pattern, html)
+    # 替换多余的nbsp 字符
+    html.replace('&nbsp', ' ')
+    html.replace('/&nbsp;', ' ')
+    print(type(items))
+    for item in items:
+        yield {
+            '排名': item[0],
+            '豆瓣链接': item[1],
+            '电影图片': str(item[2]),
+            '电影名称': item[3],
+            '电影别名': item[4],
+            '导演及演员': item[5].strip(),
+            '上映年代及电影标签': item[6].strip(),
+            '评价人数': item[7],
+            '电影格言': item[8],
+        }
+# 写入xlsx函数
+def WriteDictToXlsx(D):
+    # 创建excel工作表
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+
+
+    row = 1
+    for key, values in D.items():
+        # Put the key in the first column for each key in the dictionary
+        sheet.cell(row=row, column=1, value=key)
+        column = 2
+        for element in values:
+            # Put the element in each adjacent column for each element in the tuple
+            sheet.cell(row=row, column=column, value=element)
+            column += 1
+        row += 1
+
+    workbook.save(filename="my_workbook.xlsx")
+
+#创建写入 csv 函数
+# def write_to_file(content):
+#     with open('douban2Top250.txt', 'a', encoding='utf-8') as f:
+#         f.write(json.dumps(content, ensure_ascii=False) + '\n')
+
+
+# 定义main 函数
+def main(start):
+    # 更改链接
+    url = 'https://movie.douban.com/top250?start='+str(start)
+    print(url)
+    html = get_one_page(url)
+    for item in parse_one_page(html):
+        print(item)
+        WriteDictToXlsx(item)
+
+if __name__ == '__main__':
+    # 更改链接
+    for start in range(0, 225, 25):
+        main(start)
+        #设置延时
+        time.sleep(1)
+
+
